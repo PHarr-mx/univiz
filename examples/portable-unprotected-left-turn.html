@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>无保护左转：路径冲突与六种路口条件</title>
+<style>
+:root { color-scheme:light; --foreground:#172033; --background:#ffffff; --muted:#eef1f5; --border:#77869a; --viz-series-1:#2563eb; --viz-series-2:#a15c16; --viz-series-3:#b64353; --green:#157347; --red:#bd303b; }
+* { box-sizing:border-box; }
+body { margin:0; background:#f3f5f8; color:var(--foreground); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:1000px; margin:24px auto; padding:24px; background:var(--background); border:1px solid #dbe1ea; border-radius:12px; }
+h1 { margin:0 0 12px; font-size:clamp(22px,4vw,30px); line-height:1.3; }
+.form-label { display:grid; gap:6px; font-weight:600; }
+.form-select { width:100%; max-width:480px; min-height:44px; border:1px solid var(--border); border-radius:6px; padding:8px 12px; font:inherit; color:var(--foreground); background:var(--background); }
+.form-select:focus-visible { outline:3px solid #93c5fd; outline-offset:2px; }
+.text-small { font-size:14px; }
+.text-muted { color:#526176; }
+@media(max-width:600px) { main { margin:0; padding:16px; border:0; border-radius:0; } }
+
+    #ult-explainer { color:var(--foreground); background:var(--background); width:100%; box-sizing:border-box; }
+    #ult-explainer * { box-sizing:border-box; }
+    #ult-explainer .ult-stage { width:100%; overflow-x:auto; }
+    #ult-explainer .ult-scene { display:block; width:100%; min-width:580px; height:auto; overflow:visible; }
+    #ult-explainer .ult-scene text { fill:var(--foreground); font-weight:400; }
+    #ult-explainer .ult-legend { display:flex; flex-wrap:wrap; gap:10px 20px; margin:8px 0; }
+    #ult-explainer .ult-key { display:inline-flex; align-items:center; gap:7px; }
+    #ult-explainer .ult-swatch { width:18px; height:10px; background:var(--viz-series-1); border-radius:2px; }
+    #ult-explainer .ult-swatch.other { background:var(--viz-series-2); }
+    #ult-explainer .ult-swatch.conflict { background:var(--viz-series-3); border-radius:50%; width:12px; height:12px; }
+    #ult-explainer .ult-detail { margin:10px 0 0; }
+    #ult-explainer .ult-label { display:flex; gap:12px; flex-wrap:wrap; justify-content:space-between; margin:12px 0 4px; }
+</style>
+</head>
+<body>
+<main>
+<h1>无保护左转，为什么更难判断？</h1>
+<p>左转路径会穿越对向直行路径。圆灯放行不等于左转优先；盲区、对方意图和出口行人都可能增加判断难度。</p>
+<div id="ult-explainer">
+  <div class="viz-controls">
+    <label class="form-label" for="ult-condition">路口条件
+      <select id="ult-condition" class="form-select" disabled>
+        <option value="permissive">无保护：直行车正在接近</option>
+        <option value="protected">对照：左转箭头灯放行</option>
+        <option value="gap">挑战①：出现车流间隙</option>
+        <option value="intent">挑战②：对向车减速</option>
+        <option value="occlusion">挑战③：大车遮挡视线</option>
+        <option value="multi">挑战④：出口有行人</option>
+      </select>
+    </label>
+  </div>
+  <p id="ult-status" class="text-small text-muted">当前显示静态示意；允许 JavaScript 后可切换路口条件。窄屏可横向滚动示意图。</p>
+  <div class="ult-label"><strong id="ult-heading">同是绿灯，路径仍相交</strong><span class="text-small text-muted">右侧通行 · 路口示意，非驾驶指令</span></div>
+  <div class="ult-stage">
+    <svg xmlns="http://www.w3.org/2000/svg" class="ult-scene" id="ult-scene" viewBox="0 0 620 380" role="img" aria-labelledby="ult-svg-title ult-svg-desc">
+      <title id="ult-svg-title">无保护左转的路径冲突</title>
+      <desc id="ult-svg-desc">本车由南向北驶来并左转向西，对向车辆由北向南直行，两条行驶路径在路口交叉。本车应让对向直行车先行。</desc>
+      <path d="M230 0H370V130H620V250H370V380H230V250H0V130H230Z" fill="var(--muted)"/>
+      <path d="M300 0V125M300 255V380M0 190H225M375 190H620" stroke="var(--border)" stroke-width="1.5"/>
+      <path d="M345 340V230Q345 160 225 160H32" stroke="var(--viz-series-1)" stroke-width="3" stroke-dasharray="8 6" fill="none"/>
+      <path d="M267 25V345" stroke="var(--viz-series-2)" stroke-width="2" fill="none"/>
+      <circle cx="267" cy="164" r="21" fill="var(--viz-series-3)" fill-opacity="0.2" stroke="var(--viz-series-3)"/>
+      <rect x="333" y="290" width="24" height="40" rx="5" fill="var(--viz-series-1)"/>
+      <rect x="255" y="64" width="24" height="40" rx="5" fill="var(--viz-series-2)"/>
+      <text x="382" y="315" fill="var(--foreground)">本车左转</text><text x="185" y="44" fill="var(--foreground)">对向直行</text>
+      <text x="40" y="88" fill="var(--foreground)">路径冲突，左转让行</text>
+    </svg>
+  </div>
+  <div class="ult-legend text-small" aria-label="图例">
+    <span class="ult-key"><span class="ult-swatch"></span>本车 / 左转路径</span>
+    <span class="ult-key"><span class="ult-swatch other"></span>对向 / 直行路径</span>
+    <span class="ult-key"><span class="ult-swatch conflict"></span>冲突区域</span>
+  </div>
+  <p id="ult-detail" class="ult-detail" aria-live="polite">圆灯放行不等于左转优先；先让对向直行车通过。</p>
+  <script>
+    (function(){
+      try {
+        const root = document.getElementById('ult-explainer');
+        if (!root) return;
+        const liveSvg = root.querySelector('#ult-scene');
+        let svg = liveSvg;
+        const choice = root.querySelector('#ult-condition');
+        const heading = root.querySelector('#ult-heading');
+        const detail = root.querySelector('#ult-detail');
+        const stage = root.querySelector('.ult-stage');
+        if (!liveSvg || !choice || !heading || !detail || !stage) return;
+        const states = {
+          permissive: {heading:'同是绿灯，路径仍相交',detail:'圆灯放行不等于左转优先；先让对向直行车通过。',signal:'圆灯同绿',decision:'本车让行'},
+          protected: {heading:'有保护：信号灯错开冲突车流',detail:'本例左转箭头绿灯放行、对向直行红灯；转弯仍须观察路口内的其他参与者。',signal:'左转箭头绿',decision:'本车获准左转'},
+          gap: {heading:'间隙不是距离，而是可用时间',detail:'来车更远不代表一定够用；还要比较其到达时间、本车清空冲突区的时间及不确定性余量。',signal:'圆灯同绿',decision:'评估间隙'},
+          intent: {heading:'对向车减速，不代表承诺让行',detail:'对方可能随后加速；系统必须持续更新预测，不能把一次减速直接当作通行许可。',signal:'圆灯同绿',decision:'意图未确定'},
+          occlusion: {heading:'看不见来车，不等于没有来车',detail:'大车遮住相邻车道；保守处理未知，必要的前探也不能侵占来车通道或阻塞路口。',signal:'圆灯同绿',decision:'视野未确认'},
+          multi: {heading:'让过直行车，出口仍可能被占用',detail:'行人正在穿越转入道路；即使对向车流有间隙，本车仍要让行并确认出口可用。',signal:'圆灯同绿',decision:'继续让行'}
+        };
+        const ns = 'http://www.w3.org/2000/svg';
+        const colors = {ego:'var(--viz-series-1)',other:'var(--viz-series-2)',conflict:'var(--viz-series-3)',fg:'var(--foreground)',muted:'var(--muted)',line:'var(--border)',green:'var(--green)',red:'var(--red)'};
+        function el(tag,attrs,parent,text){
+          const node = document.createElementNS(ns,tag);
+          Object.entries(attrs || {}).forEach(([key,value])=>node.setAttribute(key,String(value)));
+          if (text !== undefined) node.textContent=text;
+          (parent || svg).appendChild(node);
+          return node;
+        }
+        function draw(){
+          svg = liveSvg.cloneNode(false);
+          const key = choice.value;
+          const state = states[key] || states.permissive;
+          const width = Math.max(620,Math.round(stage.getBoundingClientRect().width || 620));
+          const height = Math.max(330,Math.min(430,width * 0.64));
+          const X = n=>Math.round(n*width);
+          const Y = n=>Math.round(n*height);
+          const mid = X(0.50), left = X(0.33), right = X(0.65), north = Y(0.34), south = Y(0.65);
+          const ex = X(0.57), ox = X(0.43), lane = Math.max(16,Math.min(25,width * 0.043));
+          const cy = Y(0.42), carH = lane * 1.65;
+          svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+
+          el('title',{id:'ult-svg-title'},svg,state.heading);
+          el('desc',{id:'ult-svg-desc'},svg,`${state.detail} 本车从下方接近路口，向左转出；对向车从上方向下直行。`);
+          heading.textContent=state.heading;
+          detail.textContent=state.detail;
+          const defs=el('defs');
+          [['ult-a-ego',colors.ego],['ult-a-other',colors.other]].forEach(([id,fill])=>{
+            const marker=el('marker',{id,viewBox:'0 0 10 10',refX:8,refY:5,markerWidth:5,markerHeight:5,orient:'auto'},defs);
+            el('path',{d:'M0 0L10 5L0 10Z',fill},marker);
+          });
+          el('path',{d:`M${left} 0H${right}V${north}H${width}V${south}H${right}V${height}H${left}V${south}H0V${north}H${left}Z`,fill:colors.muted});
+          const structural=`M${mid} 0V${north-8}M${mid} ${south+8}V${height}M0 ${Y(.50)}H${left-8}M${right+8} ${Y(.50)}H${width}`;
+          el('path',{d:structural,stroke:colors.line,'stroke-width':1.5,fill:'none'});
+          el('path',{d:`M${left+5} ${Y(.29)}H${mid-4}M${mid+4} ${Y(.72)}H${right-5}`,stroke:colors.fg,'stroke-width':2,opacity:.45});
+          for(let i=0;i<6;i++) el('rect',{x:X(.23),y:Y(.35)+i*(south-north)/6,width:Math.max(8,width*.025),height:(south-north)/10,fill:colors.fg,opacity:.18});
+          if (key === 'occlusion') {
+            el('path',{d:`M${ex} ${Y(.68)}L${X(.30)} 0H${X(.45)}Z`,fill:colors.conflict,'fill-opacity':.12});
+            el('path',{d:`M${X(.36)} ${Y(.05)}V${Y(.30)}`,stroke:colors.other,'stroke-width':2,'stroke-dasharray':'4 5',opacity:.6});
+            el('rect',{x:X(.36)-lane/2,y:Y(.075),width:lane,height:carH,rx:4,fill:colors.other,opacity:.3,stroke:colors.other,'stroke-dasharray':'3 3'});
+            el('text',{x:X(.08),y:Y(.12)},svg,'盲区：未知');
+            el('path',{d:`M${X(.28)} ${Y(.13)}L${X(.35)} ${Y(.15)}`,stroke:colors.line,fill:'none'});
+          }
+          const protectedMode = key === 'protected';
+          const endY = protectedMode ? Y(.27) : Y(.92);
+          el('path',{d:`M${ox} ${Y(.03)}V${endY}`,stroke:colors.other,'stroke-width':2,'stroke-dasharray':protectedMode?'5 4':'none',fill:'none','marker-end':'url(#ult-a-other)',opacity:protectedMode?.45:1});
+          if(!protectedMode) {
+            el('ellipse',{cx:ox,cy:cy+Y(.008),rx:Math.max(17,width*.037),ry:20,fill:colors.conflict,'fill-opacity':.18,stroke:colors.conflict,'stroke-width':1.2});
+            el('text',{x:X(.055),y:Y(.24)},svg,'直行冲突区');
+            el('path',{d:`M${X(.25)} ${Y(.245)}L${ox-13} ${cy-13}`,stroke:colors.line,'stroke-width':1,fill:'none'});
+          }
+          const route=`M${ex} ${Y(.94)}V${Y(.60)}Q${ex} ${cy} ${X(.37)} ${cy}H${X(.04)}`;
+          el('path',{d:route,stroke:colors.ego,'stroke-width':3,'stroke-dasharray':protectedMode?'none':'7 6',fill:'none','marker-end':'url(#ult-a-ego)'});
+          function car(x,y,truck){
+            const w=truck?lane*1.45:lane;
+            const h=truck?carH*1.7:carH;
+            el('rect',{x:x-w/2,y:y-h/2,width:w,height:h,rx:4,fill:colors.other});
+            el('rect',{x:x-w*.32,y:y+h*.19,width:w*.64,height:h*.13,rx:1,fill:'var(--background)',opacity:.65});
+          }
+          const oy= key==='gap'||key==='multi'?Y(.09):key==='intent'?Y(.19):Y(.20);
+          car(ox,oy,key==='occlusion');
+          if(key==='intent') {
+            el('path',{d:`M${ox-lane} ${Y(.245)}H${ox+lane}M${ox-lane*.7} ${Y(.265)}H${ox+lane*.7}`,stroke:colors.other,'stroke-width':2});
+          }
+          el('rect',{x:ex-lane/2,y:Y(.82)-carH/2,width:lane,height:carH,rx:4,fill:colors.ego});
+          el('rect',{x:ex-lane*.32,y:Y(.82)-carH*.31,width:lane*.64,height:carH*.13,rx:1,fill:'var(--background)',opacity:.65});
+          el('text',{x:X(.045),y:Y(.92)},svg,'对向直行 ↓');
+          el('text',{x:X(.68),y:Y(.84)},svg,'本车');
+          el('text',{x:X(.68),y:Y(.90)},svg,state.decision);
+          if(protectedMode) {
+            el('circle',{cx:ox-lane-12,cy:Y(.26),r:7,fill:colors.red});
+            el('text',{x:X(.05),y:Y(.16)},svg,'对向红灯');
+            el('path',{d:`M${X(.23)} ${Y(.17)}L${ox-lane-12} ${Y(.235)}`,stroke:colors.line,fill:'none'});
+          }
+          const sx=X(.77),sy=Y(.13);
+          if(protectedMode){
+            el('path',{d:`M${sx+10} ${sy+8}V${sy-5}H${sx-10}M${sx-3} ${sy-12}L${sx-10} ${sy-5}L${sx-3} ${sy+2}`,stroke:colors.green,'stroke-width':3,fill:'none','stroke-linejoin':'round'});
+          } else el('circle',{cx:sx,cy:sy,r:8,fill:colors.green});
+          el('text',{x:X(.68),y:Y(.22)},svg,state.signal);
+          if(key==='multi') {
+            const px=X(.244),py=Y(.43);
+            el('circle',{cx:px,cy:py,r:10,fill:colors.conflict});
+            el('path',{d:`M${px} ${Y(.31)}V${Y(.61)}`,stroke:colors.conflict,'stroke-width':2,'stroke-dasharray':'3 4',fill:'none'});
+            el('text',{x:X(.045),y:Y(.61)},svg,'行人横穿');
+            el('ellipse',{cx:px,cy,rx:20,ry:22,fill:colors.conflict,'fill-opacity':.12,stroke:colors.conflict,'stroke-width':1.2});
+          }
+          el('text',{x:X(.045),y:Y(.73)},svg,key==='gap'?'远处来车仍需预测':key==='intent'?'减速 ≠ 让出路权':key==='occlusion'?'相邻车道也可能有车':'');
+          liveSvg.setAttribute('viewBox', svg.getAttribute('viewBox'));
+          liveSvg.replaceChildren(...svg.childNodes);
+          svg = liveSvg;
+        }
+        draw();
+        choice.disabled = false;
+        const status = root.querySelector('#ult-status');
+        if (status) status.textContent = '可切换 6 种路口条件。窄屏可横向滚动示意图。';
+        choice.addEventListener('change', draw);
+        if(typeof ResizeObserver!=='undefined') new ResizeObserver(draw).observe(stage);
+      } catch(error) {
+        console.error(error);
+        const fallback=document.getElementById('ult-detail');
+        if(fallback) fallback.textContent='示意：本车左转会穿越对向直行路径，必须先让行；盲区、行人和对方意图都需要额外判断。';
+      }
+    })();
+  </script>
+</div>
+
+<p class="text-small text-muted">本页为机制示意，非驾驶指令；实际通行以当地法规、信号和现场条件为准。无需联网，不依赖任何编辑器或工具专用接口。</p>
+</main>
+</body>
+</html>
