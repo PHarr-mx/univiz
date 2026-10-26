@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>示例季度数量：ECharts 与静态降级</title>
+<style>
+:root { color-scheme: light; --viz-fg:#172033; --viz-bg:#fff; --viz-accent:#2563eb; }
+* { box-sizing:border-box; }
+body { margin:0; background:#f3f5f8; color:var(--viz-fg); font:16px/1.6 system-ui,sans-serif; }
+main { max-width:900px; margin:auto; padding:24px; background:var(--viz-bg); }
+h1 { font-size:26px; }
+svg { display:block; width:100%; height:auto; }
+#chart { height:380px; width:100%; }
+#chart[hidden], [hidden] { display:none; }
+table { border-collapse:collapse; width:100%; }
+caption { text-align:left; font-weight:600; }
+th, td { border-bottom:1px solid #dce2eb; padding:10px; text-align:left; }
+.note { color:#526176; font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+<h1>示例季度数量</h1>
+<p>示例数据，仅用于展示结构，非真实业务数据。第二季度数量最多，为 24 件；第一季度为 12 件，第三季度为 18 件。</p>
+<p id="status" class="note" role="status">当前可阅读静态图和数据表。交互图需要 JavaScript 和网络；库不可用时保持静态显示。</p>
+<div id="fallback">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-labelledby="chart-title chart-desc">
+<title id="chart-title">示例季度数量柱状图</title>
+<desc id="chart-desc">第一季度 12 件，第二季度 24 件，第三季度 18 件。横轴为数量，单位件。</desc>
+<g fill="#172033" font-family="system-ui,sans-serif" font-size="17">
+<text x="20" y="60">第一季度</text><text x="20" y="120">第二季度</text><text x="20" y="180">第三季度</text>
+</g>
+<g fill="#2563eb"><rect x="120" y="35" width="210" height="36" rx="4"/><rect x="120" y="95" width="420" height="36" rx="4"/><rect x="120" y="155" width="315" height="36" rx="4"/></g>
+<g fill="#172033" font-family="system-ui,sans-serif" font-size="17"><text x="342" y="60">12 件</text><text x="552" y="120">24 件</text><text x="447" y="180">18 件</text></g>
+<path d="M120 210H600" stroke="#77869a"/><text x="120" y="232" fill="#526176" font-size="14">0</text>
+</svg>
+</div>
+<div id="chart" hidden role="img" aria-label="示例季度数量交互柱状图；精确数据见下表"></div>
+<table><caption>完整示例数据</caption><thead><tr><th scope="col">季度</th><th scope="col">数量（件）</th></tr></thead><tbody><tr><th scope="row">第一季度</th><td>12</td></tr><tr><th scope="row">第二季度</th><td>24</td></tr><tr><th scope="row">第三季度</th><td>18</td></tr></tbody></table>
+<p class="note">交互增强使用 ECharts 5.6.0（Apache-2.0），从 jsDelivr 加载。静态图和数据表无需联网；完全离线时不保证交互图加载。页面不向外部发送表格数据。</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+<script>
+(function () {
+  var target = document.getElementById('chart');
+  var fallback = document.getElementById('fallback');
+  var status = document.getElementById('status');
+  var chart;
+  if (!window.echarts || !target || !fallback) return;
+  try {
+    target.hidden = false;
+    chart = window.echarts.init(target, null, {renderer:'svg'});
+    var option = {
+      animation:false,
+      tooltip:{trigger:'axis',triggerOn:'mousemove|click',renderMode:'richText',confine:true},
+      grid:{left:24,right:24,top:32,bottom:24,containLabel:true},
+      xAxis:{type:'value',name:'件'},
+      yAxis:{type:'category',inverse:true,data:['第一季度','第二季度','第三季度']},
+      series:[{name:'数量（件）',type:'bar',data:[12,24,18],label:{show:true,position:'right'}}]
+    };
+    chart.setOption(option);
+    fallback.hidden = true;
+    status.textContent = '交互图已加载，可点击或悬停查看数量；完整数据表始终可读。';
+    var resize = function () { chart.resize(); };
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(target);
+    else window.addEventListener('resize',resize);
+    window.addEventListener('pagehide',function () { chart.dispose(); });
+  } catch (error) {
+    target.hidden = true;
+    fallback.hidden = false;
+    status.textContent = '交互图不可用，已保留静态图和完整数据表。';
+    if (chart) chart.dispose();
+  }
+})();
+</script>
+</body>
+</html>
